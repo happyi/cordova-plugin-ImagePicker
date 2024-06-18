@@ -26,8 +26,8 @@
     <description>Cordova ImagePicker Plugin</description>
     <license>Apache 2.0</license>
     <keywords>cordova,ImagePicker</keywords>
-    <repo>https://github.com/giantss/cordova-plugin-ImagePicker.git</repo>
-    <issue>https://github.com/giantss/cordova-plugin-ImagePicker/issues</issue>
+    <repo>https://github.com/happyi/cordova-plugin-ImagePicker</repo>
+    <issue>https://github.com/happyi/cordova-plugin-ImagePicker/issues</issue>
 
     <!--require cordova version -->
     <engines>
