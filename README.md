@@ -7,7 +7,7 @@ support android 10
 ## Installing the plugin
 
 ```
-cordova plugin add cordova-plugin-mz-imagepicker
+cordova plugin add cordova-plugin-mz-image-picker
 ```
 
 ## Using the plugin
