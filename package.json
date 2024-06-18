@@ -1,6 +1,6 @@
 {
   "name": "cordova-plugin-mz-image-picker",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Cordova ImagePicker Plugin",
   "cordova": {
     "id": "cordova-plugin-mz-image-picker",
