@@ -20,7 +20,7 @@
 
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
            id="cordova-plugin-mz-image-picker"
-      version="1.2.6">
+      version="1.2.7">
 
     <name>ImagePicker</name>
     <description>Cordova ImagePicker Plugin</description>
@@ -49,12 +49,12 @@
             </feature>
         </config-file>
 
-        <preference name="CAMERA_USAGE_DESCRIPTION" default="拍照上传需要使用相机" />
+        <preference name="CAMERA_USAGE_DESCRIPTION" default="本应用需要访问您的相机，以便您能够拍摄照片并上传到个人资料中。" />
         <config-file target="*-Info.plist" parent="NSCameraUsageDescription">
             <string>$CAMERA_USAGE_DESCRIPTION</string>
         </config-file>
 
-        <preference name="PHOTOLIBRARY_USAGE_DESCRIPTION" default="选图上传需要访问相册" />
+        <preference name="PHOTOLIBRARY_USAGE_DESCRIPTION" default="本应用需要访问您的相册，以便您能够选择照片并上传到个人资料中。" />
         <config-file target="*-Info.plist" parent="NSPhotoLibraryUsageDescription">
             <string>$PHOTOLIBRARY_USAGE_DESCRIPTION</string>
         </config-file>

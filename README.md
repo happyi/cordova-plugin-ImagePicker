@@ -25,3 +25,8 @@ window.imagePicker.getPictures(
 		console.log('Error: ' + error);
 	}
 );
+### 发布
+```
+npm publish --registry=https://registry.npmjs.org/
+```
+
