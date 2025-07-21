@@ -29,7 +29,7 @@ static dispatch_once_t onceToken;
         manager = [[self alloc] init];
         // manager.cachingImageManager = [[PHCachingImageManager alloc] init];
         // manager.cachingImageManager.allowsCachingHighQualityImages = YES;
-        
+
         [manager configTZScreenWidth];
     });
     return manager;
@@ -62,11 +62,11 @@ static dispatch_once_t onceToken;
         TZScreenScale = 1.5;
     }
 }
-             
+
 + (NSInteger)authorizationStatus {
-    
+
     return [PHPhotoLibrary authorizationStatus];
-    
+
 }
 
 /// Return YES if Authorized 返回YES如果得到了授权
@@ -81,7 +81,7 @@ static dispatch_once_t onceToken;
          */
         [self requestAuthorizationWithCompletion:nil];
     }
-    
+
     return status == 3;
 }
 
@@ -93,7 +93,7 @@ static dispatch_once_t onceToken;
             }
         });
     };
-    
+
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {
             callCompletionBlock();
@@ -114,12 +114,17 @@ static dispatch_once_t onceToken;
     if (!self.sortAscendingByModificationDate) {
         option.sortDescriptors = @[[NSSortDescriptor sortDescriptorWithKey:@"creationDate" ascending:self.sortAscendingByModificationDate]];
     }
-    PHFetchResult *smartAlbums = [PHAssetCollection fetchAssetCollectionsWithType:PHAssetCollectionTypeSmartAlbum subtype:PHAssetCollectionSubtypeAlbumRegular options:nil];
+
+    PHFetchResult *smartAlbums = [PHAssetCollection fetchAssetCollectionsWithType:PHAssetCollectionTypeSmartAlbum
+                                                                        subtype:PHAssetCollectionSubtypeAny
+                                                                       options:nil];
+
     for (PHAssetCollection *collection in smartAlbums) {
         // 有可能是PHCollectionList类的的对象，过滤掉
         if (![collection isKindOfClass:[PHAssetCollection class]]) continue;
         // 过滤空相册
-        if (collection.estimatedAssetCount <= 0) continue;
+        if ([self isEmptyAlbum:collection] && ![self isCameraRollAlbum:collection]) continue;
+
         if ([self isCameraRollAlbum:collection]) {
             PHFetchResult *fetchResult = [PHAsset fetchAssetsInAssetCollection:collection options:option];
             model = [self modelWithResult:fetchResult name:collection.localizedTitle isCameraRoll:YES needFetchAssets:needFetchAssets];
@@ -127,6 +132,13 @@ static dispatch_once_t onceToken;
             break;
         }
     }
+}
+
+- (BOOL)isEmptyAlbum:(PHAssetCollection *)collection {
+    if (collection.estimatedAssetCount > 0) return NO;
+    // 对某些系统相册（如RecentlyAdded）不依赖estimatedAssetCount
+    PHFetchResult *result = [PHAsset fetchAssetsInAssetCollection:collection options:nil];
+    return result.count == 0;
 }
 
 - (void)getAllAlbums:(BOOL)allowPickingVideo allowPickingImage:(BOOL)allowPickingImage needFetchAssets:(BOOL)needFetchAssets completion:(void (^)(NSArray<TZAlbumModel *> *))completion{
@@ -141,7 +153,12 @@ static dispatch_once_t onceToken;
     }
     // 我的照片流 1.6.10重新加入..
     PHFetchResult *myPhotoStreamAlbum = [PHAssetCollection fetchAssetCollectionsWithType:PHAssetCollectionTypeAlbum subtype:PHAssetCollectionSubtypeAlbumMyPhotoStream options:nil];
-    PHFetchResult *smartAlbums = [PHAssetCollection fetchAssetCollectionsWithType:PHAssetCollectionTypeSmartAlbum subtype:PHAssetCollectionSubtypeAlbumRegular options:nil];
+
+
+    PHFetchResult *smartAlbums = [PHAssetCollection fetchAssetCollectionsWithType:PHAssetCollectionTypeSmartAlbum
+                                                                        subtype:PHAssetCollectionSubtypeAny
+                                                                       options:nil];
+
     PHFetchResult *topLevelUserCollections = [PHCollectionList fetchTopLevelUserCollectionsWithOptions:nil];
     PHFetchResult *syncedAlbums = [PHAssetCollection fetchAssetCollectionsWithType:PHAssetCollectionTypeAlbum subtype:PHAssetCollectionSubtypeAlbumSyncedAlbum options:nil];
     PHFetchResult *sharedAlbums = [PHAssetCollection fetchAssetCollectionsWithType:PHAssetCollectionTypeAlbum subtype:PHAssetCollectionSubtypeAlbumCloudShared options:nil];
@@ -154,13 +171,13 @@ static dispatch_once_t onceToken;
             if (collection.estimatedAssetCount <= 0 && ![self isCameraRollAlbum:collection]) continue;
             PHFetchResult *fetchResult = [PHAsset fetchAssetsInAssetCollection:collection options:option];
             if (fetchResult.count < 1 && ![self isCameraRollAlbum:collection]) continue;
-            
+
             if ([self.pickerDelegate respondsToSelector:@selector(isAlbumCanSelect:result:)]) {
                 if (![self.pickerDelegate isAlbumCanSelect:collection.localizedTitle result:fetchResult]) {
                     continue;
                 }
             }
-            
+
             if (collection.assetCollectionSubtype == PHAssetCollectionSubtypeSmartAlbumAllHidden) continue;
             if (collection.assetCollectionSubtype == 1000000201) continue; //『最近删除』相册
             if ([self isCameraRollAlbum:collection]) {
@@ -215,13 +232,13 @@ static dispatch_once_t onceToken;
         canSelect = [self.pickerDelegate isAssetCanSelect:asset];
     }
     if (!canSelect) return nil;
-    
+
     TZAssetModel *model;
     TZAssetModelMediaType type = [self getAssetType:asset];
     if (!allowPickingVideo && type == TZAssetModelMediaTypeVideo) return nil;
     if (!allowPickingImage && type == TZAssetModelMediaTypePhoto) return nil;
     if (!allowPickingImage && type == TZAssetModelMediaTypePhotoGif) return nil;
-    
+
     PHAsset *phAsset = (PHAsset *)asset;
     if (self.hideWhenCanNotSelect) {
         // 过滤掉尺寸不满足要求的图片
@@ -368,7 +385,7 @@ static dispatch_once_t onceToken;
         CGFloat pixelHeight = pixelWidth / aspectRatio;
         imageSize = CGSizeMake(pixelWidth, pixelHeight);
     }
-    
+
     __block UIImage *image;
     // 修复获取图片时出现的瞬间内存过高问题
     // 下面两行代码，来自hsjcom，他的github是：https://github.com/hsjcom 表示感谢
@@ -457,9 +474,9 @@ static dispatch_once_t onceToken;
 }
 
 - (PHImageRequestID)getOriginalPhotoDataWithAsset:(PHAsset *)asset progressHandler:(void (^)(double progress, NSError *error, BOOL *stop, NSDictionary *info))progressHandler completion:(void (^)(NSData *data,NSDictionary *info,BOOL isDegraded))completion {
-    
+
     BOOL isHEIF = [self checkHEIF:asset]; // added
-    
+
     PHImageRequestOptions *option = [[PHImageRequestOptions alloc] init];
     option.networkAccessAllowed = YES;
     if ([[asset valueForKey:@"filename"] hasSuffix:@"GIF"]) {
@@ -468,10 +485,10 @@ static dispatch_once_t onceToken;
     }
     [option setProgressHandler:progressHandler];
     option.deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat;
-    
+
 
     return [[PHImageManager defaultManager] requestImageDataForAsset:asset options:option resultHandler:^(NSData *imageData, NSString *dataUTI, UIImageOrientation orientation, NSDictionary *info) {
-        
+
         BOOL downloadFinined = (![[info objectForKey:PHImageCancelledKey] boolValue] && ![info objectForKey:PHImageErrorKey]);
         if (downloadFinined && imageData) {
             if (completion) {
@@ -486,11 +503,11 @@ static dispatch_once_t onceToken;
                 }
             }
         }
-        
-        
-        
-        
-        
+
+
+
+
+
     }];
 }
 
@@ -508,11 +525,11 @@ static dispatch_once_t onceToken;
                 *stop = YES;
             }
         }];
-        
+
     } else {
         NSString *UTI = [asset valueForKey:@"uniformTypeIdentifier"];
         isHEIF = [UTI isEqualToString:@"public.heif"] || [UTI isEqualToString:@"public.heic"];
-        
+
     }
     return isHEIF;
 }
@@ -627,7 +644,7 @@ static dispatch_once_t onceToken;
 - (void)startExportVideoWithVideoAsset:(AVURLAsset *)videoAsset presetName:(NSString *)presetName success:(void (^)(NSString *outputPath))success failure:(void (^)(NSString *errorMessage, NSError *error))failure {
     // Find compatible presets by video asset.
     NSArray *presets = [AVAssetExportSession exportPresetsCompatibleWithAsset:videoAsset];
-    
+
     // Begin to compress video
     // Now we just compress to low resolution if it supports
     // If you need to upload to the server, but server does't support to upload by streaming,
@@ -642,10 +659,10 @@ static dispatch_once_t onceToken;
         }
         // NSLog(@"video outputPath = %@",outputPath);
         session.outputURL = [NSURL fileURLWithPath:outputPath];
-        
+
         // Optimize for network use.
         session.shouldOptimizeForNetworkUse = true;
-        
+
         NSArray *supportedTypeArray = session.supportedFileTypes;
         if ([supportedTypeArray containsObject:AVFileTypeMPEG4]) {
             session.outputFileType = AVFileTypeMPEG4;
@@ -658,11 +675,11 @@ static dispatch_once_t onceToken;
         } else {
             session.outputFileType = [supportedTypeArray objectAtIndex:0];
         }
-        
+
         if (![[NSFileManager defaultManager] fileExistsAtPath:[NSHomeDirectory() stringByAppendingFormat:@"/tmp"]]) {
             [[NSFileManager defaultManager] createDirectoryAtPath:[NSHomeDirectory() stringByAppendingFormat:@"/tmp"] withIntermediateDirectories:YES attributes:nil error:nil];
         }
-        
+
         if ([TZImagePickerConfig sharedInstance].needFixComposition) {
             AVMutableVideoComposition *videoComposition = [self fixedCompositionWithAsset:videoAsset];
             if (videoComposition.renderSize.width) {
@@ -716,18 +733,12 @@ static dispatch_once_t onceToken;
 
 - (BOOL)isCameraRollAlbum:(PHAssetCollection *)metadata {
     NSString *versionStr = [[UIDevice currentDevice].systemVersion stringByReplacingOccurrencesOfString:@"." withString:@""];
-    if (versionStr.length <= 1) {
-        versionStr = [versionStr stringByAppendingString:@"00"];
-    } else if (versionStr.length <= 2) {
-        versionStr = [versionStr stringByAppendingString:@"0"];
-    }
     CGFloat version = versionStr.floatValue;
-    // 目前已知8.0.0 ~ 8.0.2系统，拍照后的图片会保存在最近添加中
-    if (version >= 800 && version <= 802) {
-        return ((PHAssetCollection *)metadata).assetCollectionSubtype == PHAssetCollectionSubtypeSmartAlbumRecentlyAdded;
-    } else {
-        return ((PHAssetCollection *)metadata).assetCollectionSubtype == PHAssetCollectionSubtypeSmartAlbumUserLibrary;
-    }
+
+    PHAssetCollectionSubtype subtype = metadata.assetCollectionSubtype;
+    return (subtype == PHAssetCollectionSubtypeSmartAlbumUserLibrary) ||
+           (version >= 800 && version <= 802 && subtype == PHAssetCollectionSubtypeSmartAlbumRecentlyAdded) ||
+           (subtype == PHAssetCollectionSubtypeSmartAlbumAllHidden); // 根据需要调整
 }
 
 /// 检查照片大小是否满足最小要求
@@ -758,7 +769,7 @@ static dispatch_once_t onceToken;
         UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
         UIGraphicsEndImageContext();
         return newImage;
-        
+
         /* 好像不怎么管用：https://mp.weixin.qq.com/s/CiqMlEIp1Ir2EJSDGgMooQ
         CGFloat maxPixelSize = MAX(size.width, size.height);
         CGImageSourceRef sourceRef = CGImageSourceCreateWithData((__bridge CFDataRef)UIImageJPEGRepresentation(image, 0.9), nil);
@@ -798,14 +809,14 @@ static dispatch_once_t onceToken;
         CGAffineTransform translateToCenter;
         CGAffineTransform mixedTransform;
         videoComposition.frameDuration = CMTimeMake(1, 30);
-        
+
         NSArray *tracks = [videoAsset tracksWithMediaType:AVMediaTypeVideo];
         AVAssetTrack *videoTrack = [tracks objectAtIndex:0];
-        
+
         AVMutableVideoCompositionInstruction *roateInstruction = [AVMutableVideoCompositionInstruction videoCompositionInstruction];
         roateInstruction.timeRange = CMTimeRangeMake(kCMTimeZero, [videoAsset duration]);
         AVMutableVideoCompositionLayerInstruction *roateLayerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:videoTrack];
-        
+
         if (degrees == 90) {
             // 顺时针旋转90°
             translateToCenter = CGAffineTransformMakeTranslation(videoTrack.naturalSize.height, 0.0);
@@ -825,7 +836,7 @@ static dispatch_once_t onceToken;
             videoComposition.renderSize = CGSizeMake(videoTrack.naturalSize.height,videoTrack.naturalSize.width);
             [roateLayerInstruction setTransform:mixedTransform atTime:kCMTimeZero];
         }
-        
+
         roateInstruction.layerInstructions = @[roateLayerInstruction];
         // 加入视频方向信息
         videoComposition.instructions = @[roateInstruction];
@@ -860,28 +871,28 @@ static dispatch_once_t onceToken;
 /// 修正图片转向
 - (UIImage *)fixOrientation:(UIImage *)aImage {
     if (!self.shouldFixOrientation) return aImage;
-    
+
     // No-op if the orientation is already correct
     if (aImage.imageOrientation == UIImageOrientationUp)
         return aImage;
-    
+
     // We need to calculate the proper transformation to make the image upright.
     // We do it in 2 steps: Rotate if Left/Right/Down, and then flip if Mirrored.
     CGAffineTransform transform = CGAffineTransformIdentity;
-    
+
     switch (aImage.imageOrientation) {
         case UIImageOrientationDown:
         case UIImageOrientationDownMirrored:
             transform = CGAffineTransformTranslate(transform, aImage.size.width, aImage.size.height);
             transform = CGAffineTransformRotate(transform, M_PI);
             break;
-            
+
         case UIImageOrientationLeft:
         case UIImageOrientationLeftMirrored:
             transform = CGAffineTransformTranslate(transform, aImage.size.width, 0);
             transform = CGAffineTransformRotate(transform, M_PI_2);
             break;
-            
+
         case UIImageOrientationRight:
         case UIImageOrientationRightMirrored:
             transform = CGAffineTransformTranslate(transform, 0, aImage.size.height);
@@ -890,14 +901,14 @@ static dispatch_once_t onceToken;
         default:
             break;
     }
-    
+
     switch (aImage.imageOrientation) {
         case UIImageOrientationUpMirrored:
         case UIImageOrientationDownMirrored:
             transform = CGAffineTransformTranslate(transform, aImage.size.width, 0);
             transform = CGAffineTransformScale(transform, -1, 1);
             break;
-            
+
         case UIImageOrientationLeftMirrored:
         case UIImageOrientationRightMirrored:
             transform = CGAffineTransformTranslate(transform, aImage.size.height, 0);
@@ -906,7 +917,7 @@ static dispatch_once_t onceToken;
         default:
             break;
     }
-    
+
     // Now we draw the underlying CGImage into a new context, applying the transform
     // calculated above.
     CGContextRef ctx = CGBitmapContextCreate(NULL, aImage.size.width, aImage.size.height,
@@ -922,12 +933,12 @@ static dispatch_once_t onceToken;
             // Grr...
             CGContextDrawImage(ctx, CGRectMake(0,0,aImage.size.height,aImage.size.width), aImage.CGImage);
             break;
-            
+
         default:
             CGContextDrawImage(ctx, CGRectMake(0,0,aImage.size.width,aImage.size.height), aImage.CGImage);
             break;
     }
-    
+
     // And now we just create a new UIImage from the drawing context
     CGImageRef cgimg = CGBitmapContextCreateImage(ctx);
     UIImage *img = [UIImage imageWithCGImage:cgimg];
